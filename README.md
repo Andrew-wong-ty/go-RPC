@@ -6,6 +6,10 @@
   - Supports high concurrency 
   - Supports user-defined Type in RPC arguments and return
 
+## Performance
+
+- The maximum concurrency for integer addition RPC on the Apple M2 chip is approximately `48,000` per second.
+
 ## Usage Example
 
 ```go
@@ -32,7 +36,7 @@ func TestSimpleAdd(t *testing.T)  {
     StubFactory(ifc, addr, nil)
     
     // do RPC requests
-    Concurrent := 1000
+    Concurrent := 48000
     wg := sync.WaitGroup{}
     for i := 0; i < Concurrent; i++ {
         wg.Add(1)
@@ -48,7 +52,7 @@ func TestSimpleAdd(t *testing.T)  {
 ```
 - Please refer to `rpc/rpc_test.go` for more examples
 
-## test
+## Test
 ```shell
 make test
 ```
