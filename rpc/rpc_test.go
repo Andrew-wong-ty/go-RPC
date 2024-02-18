@@ -1,15 +1,52 @@
 package rpc
 
 import (
-	"fmt"
-	"math/rand"
-	"strconv"
-	"sync"
-	"sync/atomic"
+"fmt"
+"math/rand"
+"strconv"
+"sync"
+"sync/atomic"
 "testing"
-	"time"
+"time"
 
 )
+
+type Integer int // define your type
+type Math struct { // define your interface
+	Add    func(Integer, Integer) (Integer, RemoteObjectError)
+}
+
+type SimpleMath struct{} // define your implementation
+
+func (sm *SimpleMath) Add(a, b Integer) (Integer, RemoteObjectError) {
+	return a+b, RemoteObjectError{"ok"}
+}
+
+func TestSimpleAdd(t *testing.T)  {
+
+	// make RPC server
+	ifc := &Math{} // interface
+	impl := &SimpleMath{} // implementation
+	addr := "127.0.0.1:1234"
+	service, _ := NewService(ifc, impl, 1234)
+	service.Start()
+	// make RPC client stub
+	StubFactory(ifc, addr, nil)
+
+	// do RPC requests
+	Concurrent := 1000
+	wg := sync.WaitGroup{}
+	for i := 0; i < Concurrent; i++ {
+		wg.Add(1)
+		go func() {
+			a, b := Integer(rand.Int()%100), Integer(rand.Int()%100)
+			c, err := ifc.Add(a, b)
+			fmt.Printf("%v+%v=%v, error=%v\n", a, b, c,err.Error())
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+}
 
 // Point  Note: type used in RPC must be exported and has exported fields
 type Point struct {
