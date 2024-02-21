@@ -1,31 +1,34 @@
 package rpc
 
 import (
-"fmt"
-"math/rand"
-"strconv"
-"sync"
-"sync/atomic"
-"testing"
-"time"
-
+	"fmt"
+	"log"
+	"math/rand"
+	"net"
+	"net/http"
+	"net/rpc"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
 )
 
-type Integer int // define your type
+// type Integer int // define your type
 type Math struct { // define your interface
-	Add    func(Integer, Integer) (Integer, RemoteObjectError)
+	Add func(int, int) (int, RemoteObjectError)
 }
 
 type SimpleMath struct{} // define your implementation
 
-func (sm *SimpleMath) Add(a, b Integer) (Integer, RemoteObjectError) {
-	return a+b, RemoteObjectError{"ok"}
+func (sm *SimpleMath) Add(a, b int) (int, RemoteObjectError) {
+	return a + b, RemoteObjectError{"ok"}
 }
 
-func TestSimpleAdd(t *testing.T)  {
+func TestSimpleAdd(t *testing.T) {
 
 	// make RPC server
-	ifc := &Math{} // interface
+	ifc := &Math{}        // interface
 	impl := &SimpleMath{} // implementation
 	addr := "127.0.0.1:1234"
 	service, _ := NewService(ifc, impl, 1234)
@@ -34,14 +37,59 @@ func TestSimpleAdd(t *testing.T)  {
 	StubFactory(ifc, addr, nil)
 
 	// do RPC requests
-	Concurrent := 1000
+	Concurrent := 1000000
 	wg := sync.WaitGroup{}
 	for i := 0; i < Concurrent; i++ {
 		wg.Add(1)
 		go func() {
-			a, b := Integer(rand.Int()%100), Integer(rand.Int()%100)
-			c, err := ifc.Add(a, b)
-			fmt.Printf("%v+%v=%v, error=%v\n", a, b, c,err.Error())
+			a, b := rand.Int()%100, rand.Int()%100
+			ifc.Add(a, b)
+			//c, err := ifc.Add(a, b)
+			//fmt.Printf("%v+%v=%v, error=%v\n", a, b, c,err.Error())
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+}
+
+type Args struct {
+	A, B int
+}
+
+type Arith int
+
+func (t *Arith) Add(args *Args, reply *int) error {
+	*reply = args.A + args.B
+	return nil
+}
+func TestNETRPC(t *testing.T) {
+	simpleMath := new(Arith)
+	rpc.Register(simpleMath)
+	rpc.HandleHTTP()
+	l, err := net.Listen("tcp", ":1234")
+	if err != nil {
+		log.Fatal("listen error:", err)
+	}
+	go http.Serve(l, nil)
+
+	client, err := rpc.DialHTTP("tcp", "127.0.0.1"+":1234")
+	if err != nil {
+		log.Fatal("dialing:", err)
+	}
+
+	// do RPC requests
+	Concurrent := 50000
+	wg := sync.WaitGroup{}
+	for i := 0; i < Concurrent; i++ {
+		wg.Add(1)
+		go func() {
+			args := &Args{
+				A: int(rand.Int() % 100),
+				B: int(rand.Int() % 100),
+			}
+			var reply int
+			err = client.Call("Arith.Add", args, &reply)
+			//fmt.Printf("%v+%v=%v, error=%v\n", a, b, c,err.Error())
 			wg.Done()
 		}()
 	}
@@ -69,7 +117,7 @@ func (i *MyImplementation) Add(p1, p2 Point) (Point, RemoteObjectError) {
 	// random sleep
 	random := rand.Float64()
 	if random < 0.5 {
-		time.Sleep(1*time.Second)
+		time.Sleep(1 * time.Second)
 	}
 
 	return p, RemoteObjectError{"ok"}
@@ -92,13 +140,13 @@ func TestConcurrentAdd(t *testing.T) {
 	service.Start()
 
 	// make stub and set timeout(can be nil)
-	timeout := 10*time.Millisecond
+	timeout := 10 * time.Millisecond
 	StubFactory(ifc, addr, &timeout)
 	wg := sync.WaitGroup{}
 
 	// call rpc
 	N := int32(100) // Concurrent count
-	Succeed := N // N of success rpc
+	Succeed := N    // N of success rpc
 	for i := 0; i < int(N); i++ {
 		wg.Add(1)
 		go func(order int) {

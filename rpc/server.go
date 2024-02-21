@@ -37,6 +37,7 @@ type Service struct {
 	running   uint32 // 1: running, 0: stopped
 	numCalls  uint32
 	listener  net.Listener
+	hPool     *Pool
 }
 
 // register the interface and its implementation
@@ -142,6 +143,7 @@ func NewService(ifc interface{}, impl interface{}, port int) (*Service, error) {
 		running:   0,
 		numCalls:  0,
 		listener:  nil,
+		hPool:     NewPool(4),
 	}
 	err := service.register(ifc, impl)
 	if err != nil {
@@ -153,13 +155,15 @@ func NewService(ifc interface{}, impl interface{}, port int) (*Service, error) {
 // readRequest read a single RPC request from the socket connection, return the decoded
 func (serv *Service) readRequest(conn net.Conn) (*RequestMsg, error) {
 	// read header
-	header := make([]byte, 4)
+	//header := make([]byte, 4)
+	ptr := serv.hPool.Get()
+	header := ptr.content
 	nRead, err := io.ReadFull(conn, header)
 	if err != nil || nRead == 0 {
 		return nil, err
 	}
 	size := int(binary.BigEndian.Uint32(header))
-
+	serv.hPool.Put(ptr)
 	// read body
 	body := make([]byte, size)
 	nRead, err = io.ReadFull(conn, body)

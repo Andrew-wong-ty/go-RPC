@@ -52,6 +52,11 @@ func TestSimpleAdd(t *testing.T)  {
 ```
 - Please refer to `rpc/rpc_test.go` for more examples
 
+## Optimization
+- Every time we parse the RPC data sent to the client/server, we need a 4-size `[]byte` to obtain the RPC `body` size, which is a fixed overhead. 
+So we can create a pool to store these `[]byte` objects to 
+reduce GC times. Please refer to `headerpool.go`.
+
 ## Test
 ```shell
 make test

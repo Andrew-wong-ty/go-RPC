@@ -34,6 +34,7 @@ type Client struct {
 	currSeq uint64     // identifies a call
 	pending map[uint64]*Reply
 	timeout time.Duration
+	hPool   *Pool
 }
 
 // writeRequest encode the RequestMsg into bytes and then
@@ -64,13 +65,16 @@ func (c *Client) writeRequest(req RequestMsg) error {
 // readResponse reads a single response and decode it into ReplyMsg
 func (c *Client) readResponse() (*ReplyMsg, error) {
 	// read header
-	header := make([]byte, 4)
+	//header := make([]byte, 4)
+	ptr := c.hPool.Get()
+	header := ptr.content
 	nRead, err := io.ReadFull(c.conn, header)
 	if err != nil || nRead == 0 {
 		log.Printf("client read header failed")
 		return nil, err
 	}
 	size := int(binary.BigEndian.Uint32(header))
+	c.hPool.Put(ptr)
 	// read body
 	body := make([]byte, size)
 	nRead, err = io.ReadFull(c.conn, body)
@@ -156,6 +160,7 @@ func newClient(addr string, conn net.Conn, timeout *time.Duration) *Client {
 		currSeq: 0,
 		pending: make(map[uint64]*Reply),
 		timeout: maxWaitTime,
+		hPool:   NewPool(4),
 	}
 }
 
