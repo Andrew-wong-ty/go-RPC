@@ -29,16 +29,15 @@ func TestSimpleAdd(t *testing.T)  {
     // make RPC server
     ifc := &Math{} // interface
     impl := &SimpleMath{} // implementation
-    addr := "127.0.0.1:1234"
     service, _ := NewService(ifc, impl, 1234)
     service.Start()
     // make RPC client stub
-    StubFactory(ifc, addr, nil)
+    StubFactory(ifc, "127.0.0.1:1234", nil)
     
     // do RPC requests
-    Concurrent := 48000
+    concurrency := 48000
     wg := sync.WaitGroup{}
-    for i := 0; i < Concurrent; i++ {
+    for i := 0; i < concurrency; i++ {
         wg.Add(1)
         go func() {
             a, b := Integer(rand.Int()%100), Integer(rand.Int()%100)
